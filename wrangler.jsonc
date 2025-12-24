@@ -1,0 +1,8 @@
+{
+  "name": "re-reelshort",
+  "compatibility_date": "2025-12-24",
+  "main": "./src/index.ts",          // sau calea către worker-ul generat
+  "assets": {
+    "directory": "./dist"            // schimbă cu folderul tău real de assets
+  }
+}
