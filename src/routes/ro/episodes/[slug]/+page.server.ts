@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ fetch, params, setHeaders }) => {
     headers: { 'user-agent': UA, accept: 'text/html' }
   });
 
-  if (!res.ok) throw error(res.status, 'Fetch failed');
+  if (!res.ok) throw error(res.status, '');
 
   const root = parse(await res.text());
   const details = root.querySelector('.relative');

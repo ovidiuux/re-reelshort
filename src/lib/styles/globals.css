@@ -364,6 +364,7 @@ template {
 .player-left {
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
 }
 
 .player-right {
@@ -434,48 +435,96 @@ template {
 
 .episodes {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 10px;
 }
 
+/* ===== EPISODE BUTTON ===== */
 .ep {
   appearance: none;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92);
-  border-radius: 12px;
-  padding: 10px 0;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.10),
+    rgba(255,255,255,0.04)
+  );
+  color: rgba(255,255,255,0.95);
+  border-radius: 14px;
+  padding: 12px 0;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  text-align: center;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+  user-select: none;
 }
 
-.ep:hover:not(:disabled) {
-  background: rgba(255,255,255,0.10);
-  border-color: rgba(255,255,255,0.20);
-  transform: translateY(-1px);
+/* Hover – doar desktop */
+@media (hover: hover) {
+  .ep:hover:not(:disabled) {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,255,255,0.28);
+    transform: translateY(-1px);
+  }
 }
 
 .ep:active:not(:disabled) {
-  transform: translateY(0px);
+  transform: scale(0.96);
 }
 
+/* ===== ACTIVE ===== */
 .ep.active {
-  background: rgba(255,255,255,0.16);
-  border-color: rgba(255,255,255,0.30);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.22),
+    rgba(255,255,255,0.14)
+  );
+  border-color: rgba(255,255,255,0.45);
+  box-shadow:
+    0 6px 18px rgba(0,0,0,0.45),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
 }
 
+/* ===== LOCKED ===== */
 .ep.locked,
 .ep:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
+  filter: grayscale(0.4);
 }
 
-@media (max-width: 1200px) {
+.ep.trailer {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.45);
+  color: #ffc107;
+  font-weight: 800;
+}
+
+.ep.trailer:hover:not(:disabled) {
+  background: rgba(255, 193, 7, 0.25);
+}
+
+.ep.trailer.active {
+  background: rgba(255, 193, 7, 0.35);
+  border-color: #ffc107;
+  color: #000;
+}
+
+
+/* ===== MOBILE TUNING ===== */
+@media (max-width: 640px) {
   .episodes {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ep {
+    padding: 14px 0;
+    font-size: 14px;
+    border-radius: 16px;
   }
 }
 

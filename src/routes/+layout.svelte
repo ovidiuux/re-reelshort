@@ -16,7 +16,7 @@
 <div id="__next" data-reactroot="">
   <div class="min-h-screen flex flex-col bg-black">
     <Header />
-    <main class="flex-1" style="padding: 2rem;">
+    <main class="flex-1" style="padding: 1.25rem;">
       {@render children()}
     </main>
   </div>
