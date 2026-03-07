@@ -1,0 +1,1 @@
+re-reelshort: A web reverse engineering project for https://reelshort.com/ that performs both client-side and server-side content scraping, extracts the DRM license, all without requiring a paid/premium account.
