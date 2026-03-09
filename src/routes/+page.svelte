@@ -1,136 +1,104 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import "$lib/styles/grid.css";
+  import { makeObserver, mergeUnique } from "$lib/reelshort/infinite";
+  import { extractNextData, pageListToItems } from "$lib/reelshort/utils";
 
-  export let data: {
-    items: { title: string; href: string; image: string | null }[];
-  };
+  export let data: { items: Item[] };
 
   type Item = { title: string; href: string; image: string | null };
 
-  const SHELF_BASE =
-    "https://www.reelshort.com/ro/shelf/lansare-nou%C4%83-short-movies-dramas-118663";
+  const itemKey = (it: Item) => it.href.match(/[a-f0-9]{24}/i)?.[0].toLowerCase() ?? it.href;
+
+
+  const SHELF = [
+    "https://www.reelshort.com/ro/shelf/lansare-nou%C4%83-short-movies-dramas-118663",
+    "https://www.reelshort.com/ro/shelf/identitate-ascuns%C4%83-short-movies-dramas-118664",
+    "https://www.reelshort.com/ro/shelf/pove%C8%99ti-asiatice-short-movies-dramas-118666",
+    "https://www.reelshort.com/ro/shelf/dragoste-t%C3%A2n%C4%83r%C4%83-short-movies-dramas-118665"
+  ];
 
   let items: Item[] = data.items ?? [];
-  let page = 1;
+  let page = 0;
   let loading = false;
   let done = false;
 
-  let sentinel: HTMLDivElement | null = null;
-  let obs: IntersectionObserver | null = null;
+  let ctrl: AbortController | null = null;
 
-  function fadeIn(node: HTMLImageElement) {
-    const show = () => requestAnimationFrame(() => (node.style.opacity = "1"));
-    const onLoad = () => show();
-    const onError = () => (node.style.opacity = "1");
+  const seenImg = new Set<string>();
+  const fadeIn = (node: HTMLImageElement) => {
+    const key = node.currentSrc || node.src;
+    const instant = seenImg.has(key);
 
-    node.addEventListener("load", onLoad);
-    node.addEventListener("error", onError);
+    node.style.opacity = instant ? "1" : "0";
+    if (!instant) node.style.transition = "opacity 160ms ease";
 
-    if (node.complete && node.naturalWidth > 0) show();
-
-    return {
-      destroy() {
-        node.removeEventListener("load", onLoad);
-        node.removeEventListener("error", onError);
-      }
+    const show = () => {
+      seenImg.add(key);
+      node.style.opacity = "1";
     };
-  }
 
-  function uniqMerge(prev: Item[], next: Item[]) {
-    const seen = new Set(prev.map((x) => x.href));
-    const out = [...prev];
-    for (const it of next) {
-      if (!it?.href || seen.has(it.href)) continue;
-      seen.add(it.href);
-      out.push(it);
+    if (node.complete) show();
+    else {
+      node.addEventListener("load", show, { once: true, passive: true } as any);
+      node.addEventListener("error", show, { once: true, passive: true } as any);
     }
-    return out;
-  }
 
-  function extractNextDataJson(html: string): any | null {
-    // rapid + stabil: ia strict conținutul scriptului __NEXT_DATA__
-    const m = html.match(
-      /<script[^>]*id="__NEXT_DATA__"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/i
-    );
-    if (!m?.[1]) return null;
-    try {
-      return JSON.parse(m[1]);
-    } catch {
-      return null;
-    }
-  }
+    return { destroy() {} };
+  };
 
-  function mapShelfListToItems(list: any[]): Item[] {
-    const out: Item[] = [];
-    for (const b of list ?? []) {
-      const title = String(b?.book_title ?? "").trim();
-      const pic = (b?.book_pic ? String(b.book_pic).trim() : "") || null;
-      const slug = String(b?.book_id ?? "").trim(); // ex: "691698e59d31f12dd603e162"
-
-      if (!title || !slug) continue;
-
-      out.push({
-        title,
-        image: pic,
-        href: `/ro/movie/${encodeURIComponent(slug)}`
-      });
-    }
-    return out;
-  }
-
-  async function fetchShelfPage(p: number): Promise<Item[]> {
-    const res = await fetch(`${SHELF_BASE}/${p}`, {
-      headers: { accept: "text/html" }
-    });
-
-    if (res.status === 404) return [];
-    if (!res.ok) return [];
-
-    const html = await res.text();
-    const nd = extractNextDataJson(html);
-    const list = nd?.props?.pageProps?.list;
-
-    if (!Array.isArray(list)) return [];
-    return mapShelfListToItems(list);
-  }
-
-  async function loadMore() {
+  const loadMore = async () => {
     if (loading || done) return;
+
+    if (page >= SHELF.length) {
+      done = true;
+      return;
+    }
+
     loading = true;
+    ctrl?.abort();
+    ctrl = new AbortController();
+
     try {
-      const nextPage = page + 1;
-      const nextItems = await fetchShelfPage(nextPage);
+      const url = SHELF[page];
 
-      if (!nextItems.length) {
-        done = true;
-        return;
-      }
+      const r = await fetch(url, { signal: ctrl.signal });
+      if (!r.ok) throw new Error(String(r.status));
 
-      items = uniqMerge(items, nextItems);
-      page = nextPage;
+      const html = await r.text();
+      const nextData = extractNextData(html);
+      const pageProps = nextData?.props?.pageProps;
+
+      const nextItems = pageListToItems(pageProps);
+      items = mergeUnique(items, nextItems, (x) => x.href);
+
+      page += 1;
+
+      if (!nextItems.length || page >= SHELF.length) done = true;
+    } catch (e: any) {
+      if (e?.name !== "AbortError") done = true;
     } finally {
       loading = false;
     }
-  }
+  };
 
-  onMount(() => {
-    obs = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) loadMore();
-      },
-      { rootMargin: "700px 0px" }
-    );
-
-    if (sentinel) obs.observe(sentinel);
+  const infinite = makeObserver(loadMore, {
+    rootMargin: "600px 0px 600px 0px",
+    threshold: 0
   });
 
-  onDestroy(() => obs?.disconnect());
+  onMount(() => {
+    if (!items.length) loadMore();
+    return () => ctrl?.abort();
+  });
+
+  onDestroy(() => ctrl?.abort());
 </script>
 
 <div class="grid">
-  {#each items as item (item.href)}
-    <a class="card" href={item.href}>
+  {#each items as item (itemKey(item))}
+
+    <a class="card" href={item.href} aria-label={item.title}>
       <div class="thumb">
         {#if item.image}
           <img
@@ -139,6 +107,8 @@
             alt={item.title}
             loading="lazy"
             decoding="async"
+            fetchpriority="low"
+            crossorigin="anonymous"
             use:fadeIn
           />
         {:else}
@@ -153,8 +123,4 @@
   {/each}
 </div>
 
-<div bind:this={sentinel} style="height: 1px"></div>
-
-{#if loading}
-  <div class="loading">Se încarcă…</div>
-{/if}
+<div use:infinite style="height: 1px;"></div>

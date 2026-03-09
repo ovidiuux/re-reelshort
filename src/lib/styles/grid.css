@@ -23,10 +23,8 @@
   display: block;
   color: white;
   text-decoration: none;
-  border-radius: 14px;
+  border-radius: 6px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 

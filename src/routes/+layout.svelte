@@ -1,4 +1,3 @@
-<!-- src/routes/+layout.svelte -->
 <script lang="ts">
   import Header from "$lib/components/Header.svelte";
   import "$lib/styles/globals.css";
@@ -12,11 +11,10 @@
   <link rel="icon" type="image/png" href="/favicon.webp" />
 </svelte:head>
 
-
 <div id="__next" data-reactroot="">
-  <div class="min-h-screen flex flex-col bg-black">
+  <div class="app">
     <Header />
-    <main class="flex-1" style="padding: 1.25rem;">
+    <main class="app-main">
       {@render children()}
     </main>
   </div>

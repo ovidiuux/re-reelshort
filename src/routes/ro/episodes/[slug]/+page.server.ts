@@ -1,46 +1,41 @@
-import type { PageServerLoad } from './$types';
-import { error } from '@sveltejs/kit';
-import { parse } from 'node-html-parser';
+import { BASE, UA } from "$lib/reelshort/utils";
+import type { PageServerLoad } from "./$types";
+import { error } from "@sveltejs/kit";
 
-const BASE = 'https://www.reelshort.com';
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
-
-const pickText = (n: any) => (n?.textContent || n?.text || '').trim() || null;
+const WEEK = 604800;
+const RX_M3U8 = /"contentUrl"\s*:\s*"([^"]+\.m3u8[^"]*)"/i;
+const RX_TITLE = /"name"\s*:\s*"([^"]+)"/i;
+const MAX_BUF = 32 * 1024;
 
 export const load: PageServerLoad = async ({ fetch, params, setHeaders }) => {
-  const slug = (params.slug || '').trim();
-  if (!slug) throw error(400, 'Missing slug');
+  const slug = params.slug?.trim();
+  if (!slug) throw error(400);
 
-  setHeaders({ 'cache-control': 'public, max-age=604800, s-maxage=604800' });
+  setHeaders({ "cache-control": `public, max-age=${WEEK}, s-maxage=${WEEK}` });
 
-  const res = await fetch(`${BASE}/ro/episodes/${slug}`, {
-    headers: { 'user-agent': UA, accept: 'text/html' }
+  const res = await fetch(`${BASE}/ro/episodes/${encodeURIComponent(slug)}`, {
+    headers: { "user-agent": UA, accept: "text/html" }
   });
+  if (!res.ok || !res.body) throw error(res.status);
 
-  if (!res.ok) throw error(res.status, '');
+  const r = res.body.getReader();
+  const d = new TextDecoder();
+  let buf = "", m3u8: string | null = null, title: string | null = null;
 
-  const root = parse(await res.text());
-  const details = root.querySelector('.relative');
-  if (!details) throw error(500, 'Details not found');
+  for (;;) {
+    const { value, done } = await r.read();
+    if (done) break;
 
-  const title = pickText(details.querySelector('h1'));
-  const description = pickText(details.querySelector('.rich-text'));
+    buf += d.decode(value, { stream: true });
 
-  let m3u8: string | null = null;
-  for (const s of root.querySelectorAll('script')) {
-    const t = s.text || '';
-    const hit = t.match(/https?:\/\/[^"' \n]+\.m3u8(?:\?[^"' \n]+)?/);
-    if (hit) {
-      m3u8 = hit[0];
-      break;
-    }
+    if (!m3u8) m3u8 = RX_M3U8.exec(buf)?.[1] ?? null;
+    if (!title) title = RX_TITLE.exec(buf)?.[1] ?? null;
+
+    if (m3u8 && title) { r.cancel(); break; }
+    if (buf.length >= MAX_BUF) break;
   }
 
-  return {
-    slug,
-    m3u8,
-    episode: { title, description },
-    detailsHtml: details.toString()
-  };
+  if (!m3u8) throw error(500);
+
+  return { slug, m3u8, episode: { title } };
 };
